@@ -13,28 +13,58 @@ namespace MPV
     {
         public MapViewModel()
         {
-            //            _map = new Map(SpatialReferences.WebMercator)
-            //            {
-            //                InitialViewpoint = new Viewpoint(new Envelope(-180, -85, 180, 85, SpatialReferences.Wgs84)),
-            //#warning To use ArcGIS location services (including basemaps) specify your ArcGIS Developer API Key or require the user to sign in with an ArcGIS Identity.
-            //                //Basemap = new Basemap(BasemapStyle.ArcGISStreets)
-            //            };
-
             Initialize();
         }
 
         private async Task Initialize()
         {
-            string FilePath = "C:\\Sample.mmpk";
+            string _ResourceFile = "Sample.mmpk";
+            string _LocalFile = System.IO.Path.Combine(FileSystem.Current.AppDataDirectory, _ResourceFile);
+
+            using Stream _ResourceStream = await FileSystem.Current.OpenAppPackageFileAsync(_ResourceFile);
+            using FileStream _LocalStream = System.IO.File.OpenWrite(_LocalFile);
+
+            using BinaryWriter _LocalWriter = new BinaryWriter(_LocalStream);
+
+            using (BinaryReader _ResourceReader = new BinaryReader(_ResourceStream))
+            {
+                var _BytesRead = 0;
+
+                int BufferSize = 1024;
+
+                var _Buffer = new byte[BufferSize];
+
+                using (_ResourceStream)
+                {
+                    do
+                    {
+                        _Buffer = _ResourceReader.ReadBytes(BufferSize);
+                        _BytesRead = _Buffer.Count();
+                        _LocalWriter.Write(_Buffer);
+                    }
+
+                    while (_BytesRead > 0);
+                }
+            }
+
+            _LocalWriter.Close();
+            _LocalWriter.Dispose();
+
+            _LocalStream.Close();
+            _LocalStream.Dispose();
+
+            _ResourceStream.Close();
+            _ResourceStream.Dispose();
 
             try
             {
-                MobileMapPackage Package = await MobileMapPackage.OpenAsync(FilePath);
+                MobileMapPackage Package = await MobileMapPackage.OpenAsync(_LocalFile);
                 await Package.LoadAsync();
                 Map = Package.Maps.FirstOrDefault();
             }
             catch (Exception E)
             {
+                await Application.Current.MainPage.DisplayAlert("DEBUG", E.Message, "OK");
             }
         }
 
@@ -43,6 +73,7 @@ namespace MPV
         /// <summary>
         /// Gets or sets the map
         /// </summary>
+        
         public Esri.ArcGISRuntime.Mapping.Map Map
         {
             get => _map;
@@ -53,6 +84,7 @@ namespace MPV
         /// Raises the <see cref="MapViewModel.PropertyChanged" /> event
         /// </summary>
         /// <param name="propertyName">The name of the property that has changed</param>
+        
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null) =>
                  PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
